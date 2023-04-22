@@ -1,4 +1,6 @@
 
+# Outputs (e.g. predictions)
+output/
 
 # Trained models 
 models/
