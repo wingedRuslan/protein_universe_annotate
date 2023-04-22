@@ -1,5 +1,13 @@
 
 
+# Trained models 
+models/
+
+# Research papers/articles
+_research/
+
+# Data dir
+data/
 
 # 
 .idea/
