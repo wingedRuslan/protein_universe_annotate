@@ -131,7 +131,7 @@ def plot_code_freq(data_df, split_name):
     plt.title(f'Amino Acid Code Frequency: {split_name}')
 
     # Plot the bar chart
-    sns.barplot(x='amino_acid', y='Freq', data=data_df, palette=np.array(palette_colors))
+    sns.barplot(x='amino_acid', y='frequency', data=data_df, palette=np.array(palette_colors))
 
 
 def plot_family_dist(data_df, split_name, bins=50):
@@ -203,20 +203,20 @@ def explore_pfam_dataset(data_partitions_dirpath):
 
     # Check for duplicates on 'sequence' level in each dataset split
     train_duplicates = train_df[train_df.duplicated(subset=['sequence'], keep='first')]
-    print(f'Num. duplicates in Dev: {train_duplicates.shape[0]}')
+    print(f'Num. duplicates in Train: {train_duplicates.shape[0]}')
 
     test_duplicates = test_df[test_df.duplicated(subset=['sequence'], keep='first')]
-    print(f'Num. duplicates in Dev: {test_duplicates.shape[0]}')
+    print(f'Num. duplicates in Test: {test_duplicates.shape[0]}')
 
     dev_duplicates = dev_df[dev_df.duplicated(subset=['sequence'], keep='first')]
     print(f'Num. duplicates in Dev: {dev_duplicates.shape[0]}')
 
     # Does the target label like PF00001 have multiple versions?
-    print('The target variable \'family_accession\' contains only unique mapping to its version: '.
+    print('The target variable \'family_accession\' contains only unique mapping to its version: {}'.
           format(is_bijection_mapping(total_data_df, col1='true_label', col2='family_accession')))
 
     # Does the 'family_id' and 'true_label' have 1:1 mapping?
-    print('The \'family_id\' feature contains only unique mapping to true_label feature: '.
+    print('The \'family_id\' feature contains only unique mapping to true_label feature: {}'.
           format(is_bijection_mapping(total_data_df, col1='family_id', col2='true_label')))
 
     # Distinct target label
@@ -229,15 +229,15 @@ def explore_pfam_dataset(data_partitions_dirpath):
     # Are there overlaps between sets in 'true_label'?
     overlapping_vals = compute_overlap(train_df, test_df, 'true_label')
     print(f'Number of overlapping labels Train -- Test: {len(overlapping_vals)}, '
-          f'ratio: {len(overlapping_vals) / len(test_df)}')
+          f'ratio: {len(overlapping_vals) / test_df["true_label"].nunique()}')
 
     overlapping_vals = compute_overlap(train_df, dev_df, 'true_label')
     print(f'Number of overlapping labels Train -- Dev: {len(overlapping_vals)}, '
-          f'ratio: {len(overlapping_vals) / len(dev_df)}')
+          f'ratio: {len(overlapping_vals) / dev_df["true_label"].nunique()}')
 
     overlapping_vals = compute_overlap(dev_df, test_df, 'true_label')
     print(f'Number of overlapping labels Dev -- Test: {len(overlapping_vals)}, '
-          f'ratio: {len(overlapping_vals) / len(test_df)}')
+          f'ratio: {len(overlapping_vals) / test_df["true_label"].nunique()}')
 
     # Are there overlaps between sets in 'sequence'?
     overlapping_vals = compute_overlap(train_df, test_df, 'sequence')
@@ -280,7 +280,7 @@ def explore_pfam_dataset(data_partitions_dirpath):
     plot_code_freq(train_amino_acid_freq, 'Train')
 
     plt.subplot(1, 3, 2)
-    plot_code_freq(dev_amino_acid_freq, 'Val')
+    plot_code_freq(dev_amino_acid_freq, 'Dev')
 
     plt.subplot(1, 3, 3)
     plot_code_freq(test_amino_acid_freq, 'Test')
