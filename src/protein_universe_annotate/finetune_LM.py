@@ -3,7 +3,8 @@ import numpy as np
 from sklearn import preprocessing
 from datasets import Dataset
 from evaluate import load
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, TrainingArguments, Trainer
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, \
+    TrainingArguments, HfArgumentParser, Trainer
 
 
 from protein_universe_annotate.data_processing import read_pfam_dataset, select_long_tail
@@ -94,23 +95,13 @@ def fine_tune_protein_lm(model_checkpoint_name,
     print(f'The number of trainable parameters: {model.num_parameters(only_trainable=True)}')
 
     # Define training arguments
-    model_name = model_checkpoint_name.split("/")[-1]
-    args = TrainingArguments(
-        f"{model_name}-finetuned-protein-universe",
-        evaluation_strategy="no",
-        save_strategy="epoch",
-        learning_rate=2e-5,
-        per_device_train_batch_size=batch_size,
-        per_device_eval_batch_size=batch_size,
-        num_train_epochs=1,
-        weight_decay=0.01,
-        gradient_accumulation_steps=4
-    )
-
+    parser = HfArgumentParser(TrainingArguments)
+    training_args, = parser.parse_json_file(json_file='lm_training_args.json')
+    
     # Train the model
     trainer = Trainer(
         model,
-        args,
+        training_args,
         train_dataset=train_dataset,
         eval_dataset=test_dataset,
         tokenizer=tokenizer,
