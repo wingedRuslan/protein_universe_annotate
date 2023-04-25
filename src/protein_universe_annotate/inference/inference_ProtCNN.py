@@ -158,14 +158,12 @@ def batch_inference_ProtCNN(model_path='../../../models/trn-_cnn_random__random_
     # Load the model into TensorFlow
     sess = tf.Session()
     graph = tf.Graph()
-
     with graph.as_default():
         backup_model = tf.saved_model.load(sess, ['serve'], model_path)
 
     # Load tensors for class confidence prediction
     class_confidence_signature = backup_model.signature_def['confidences']
     class_confidence_signature_tensor_name = class_confidence_signature.outputs['output'].name
-
     sequence_input_tensor_name = backup_model.signature_def['confidences'].inputs['sequence'].name
     sequence_lengths_input_tensor_name = backup_model.signature_def['confidences'].inputs['sequence_length'].name
 
@@ -198,7 +196,6 @@ def batch_inference_ProtCNN(model_path='../../../models/trn-_cnn_random__random_
 
         # Instead of returning the most probable class as pred, get TOP5 most probable classes
         # inference_results_class.extend([np.argmax(pred) for pred in preds])
-
         batch_topK_classes = get_top_k_values_indices(preds, num_top_values=pred_confidence)
         inference_results_topKclasses.extend(batch_topK_classes)
 
