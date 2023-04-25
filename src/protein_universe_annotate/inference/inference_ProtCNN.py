@@ -220,6 +220,69 @@ def batch_inference_ProtCNN(model_path='../../../models/trn-_cnn_random__random_
     return test_df
 
 
+def compute_ProtCNN_embeddings(model_path='../../../models/trn-_cnn_random__random_sp_gpu-cnn_for_random_pfam-5356760',
+                               data_path='../../../data/random_split/',
+                               save_path='../../../output/test_dataset_predictions.csv',
+                               split_name='test',
+                               batch_size=8):
+    """
+    Computes ProtCNN embeddings for a given dataset.
+
+    Args:
+        model_path (str): Path to the ProtCNN model
+        data_path (str): Path to the data directory containing dataset
+        save_path (str): Path to save the embeddings
+        split_name (str): The name of the partition to use (e.g. "train", "test", "valid").
+        batch_size (int): Size of the batches to use for calculating predictions
+
+    Returns:
+        list: A list of embeddings calculated by the trained ProtCNN model.
+    """
+
+    # Load the model into TensorFlow
+    sess = tf.Session()
+    graph = tf.Graph()
+    with graph.as_default():
+        trained_model = tf.saved_model.load(sess, ['serve'], model_path)
+
+    # Load tensors for getting the embedding of the trained model
+    sequence_input_tensor_name = trained_model.signature_def['confidences'].inputs['sequence'].name
+    sequence_lengths_input_tensor_name = trained_model.signature_def['confidences'].inputs['sequence_length'].name
+    embedding_signature = trained_model.signature_def['pooled_representation']
+    embedding_signature_tensor_name = embedding_signature.outputs['output'].name
+
+    # Read the dataset
+    data_df = read_pfam_dataset(partition=split_name, data_dir=data_path)
+
+    # Sort test_df by sequence length so that batches have as little padding as possible -> faster inference.
+    data_df = data_df.sort_values('sequence', key=lambda col: [len(c) for c in col])
+
+    # Compute the embeddings
+    embeddings = []
+    batches = list(batch_iterable(data_df.sequence, batch_size))
+    for seq_batch in tqdm.tqdm(batches, position=0):
+        seq_lens = [len(seq) for seq in seq_batch]
+        one_hots = [residues_to_one_hot(seq) for seq in seq_batch]
+        max_sequence_length = max(seq_lens)
+        padded_sequence_inputs = [pad_one_hot_sequence(seq, max_sequence_length) for seq in one_hots]
+
+        with graph.as_default():
+            batch_embeddings = sess.run(
+                embedding_signature_tensor_name,
+                {
+                    sequence_input_tensor_name: padded_sequence_inputs,
+                    sequence_lengths_input_tensor_name: seq_lens,
+                }
+            )
+        embeddings.extend(batch_embeddings)
+
+    # Save the embeddings
+    with open(save_path, 'wb') as f:
+        np.save(f, np.array(embeddings))
+
+    return embeddings
+
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Perform batch inference using ProtCNN')
