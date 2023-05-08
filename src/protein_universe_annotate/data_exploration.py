@@ -9,20 +9,48 @@ import argparse
 from protein_universe_annotate.data_processing import read_pfam_dataset
 
 
-def is_bijection_mapping(data_df, col1, col2):
+def get_partitions_info(data_frames, split_names):
     """
-    Check if there is a 1:1 mapping between 'family_accession' and 'true_label' in the given dataset.
-
-    "bijection" describes a 1:1 mapping between two sets.
-    A bijection is a function between two sets where each element of one set is paired with exactly one element of the other set.
+    Create a summary DataFrame containing basic statistics about each partition.
 
     Args:
-    dataset (pandas.DataFrame): The dataset containing col1 and col2
-    col1 (str), the column name of feature
-    col2 (str), the column name of feature
+        data_frames (list of pd.DataFrames): List of DataFrames containing data for each partition.
+        split_names (list of str): List of partition names.
 
     Returns:
-    bool: True if there is a 1:1 mapping, False otherwise.
+        A pandas DataFrame containing information about each partition.
+    """
+    return pd.DataFrame([
+        {
+            'partition': name,
+            'num_of_samples': frame.shape[0],
+            'num_of_true_class': frame['true_label'].unique().size,
+            'max_samples_per_class': frame.groupby('true_label').size().max(),
+            'min_samples_per_class': frame.groupby('true_label').size().min(),
+            'min_seq_length': frame['sequence_len'].min(),
+            'max_seq_length': frame['sequence_len'].max(),
+            'avg_seq_length': frame['sequence_len'].mean()
+        } for name, frame in zip(split_names, data_frames)]
+    )
+
+
+def is_bijection_mapping(data_df: pd.DataFrame,
+                         col1: str,
+                         col2: str):
+    """
+    Check if there is a 1:1 mapping between 'col1' and 'col2' in the given dataset.
+
+    "bijection" describes a 1:1 mapping between two sets.
+    A bijection is a function between two sets
+    where each element of one set is paired with exactly one element of the other set.
+
+    Args:
+        dataset (pandas.DataFrame): The dataset containing col1 and col2
+        col1 (str): The column name of feature
+        col2 (str): The column name of feature
+
+    Returns:
+        bool: True if there is a 1:1 mapping, False otherwise.
     """
     # Group the rows by 'col1' and count the number of unique 'col2' values in each group
     mapping_counts = data_df.groupby(col1)[col2].nunique()
@@ -33,13 +61,19 @@ def is_bijection_mapping(data_df, col1, col2):
     return False if not_bijection_mapping else True
 
 
-def compute_overlap(df1, df2, col_name):
+def compute_overlap(df1: pd.DataFrame,
+                    df2: pd.DataFrame,
+                    col_name: str):
     """
-    Compute the overlap between unique values in a given column of two DataFrames.
-    :param df1: First DataFrame
-    :param df2: Second DataFrame
-    :param col_name: Name of the column to compute the overlap for
-    :return: Tuple containing the number of overlapping unique values and their ratio
+    Computes the overlap between unique values in a given column of two DataFrames.
+
+    Args:
+        df1 (pandas DataFrame): The first DataFrame.
+        df2 (pandas DataFrame): The second DataFrame.
+        col_name (st): Name of the column to compute the overlap for.
+
+    Returns:
+        set. A set containing the overlapping values.
     """
     # Find unique values in the specified column of both DataFrames
     df1_values = set(df1[col_name])
@@ -51,30 +85,44 @@ def compute_overlap(df1, df2, col_name):
     return overlap
 
 
-def detect_outliers_zscore(df, column, threshold=3):
+def detect_outliers_zscore(data_df: pd.DataFrame,
+                           column: str,
+                           threshold: int = 3):
     """
-    Detect and return outliers in a pandas DataFrame column using the Z-score method.
-    :param df: DataFrame to detect outliers in
-    :param column: Name of the column to detect outliers in
-    :param threshold: Number of standard deviations from the mean at which to consider a value an outlier
-    :return: A DataFrame containing the outliers and their corresponding z-scores
+    Detects outliers in a pandas DataFrame column using the Z-score method.
+
+    Args:
+        data_df (pd.DataFrame): The DataFrame to detect outliers in.
+        column (str): The name of the column to detect outliers in.
+        threshold (int): The number of standard deviations from the mean at which to consider a value an outlier.
+            Default value is 3.
+
+    Returns:
+        A DataFrame containing the outliers.
     """
+
     # Calculate the z-scores for each value in the column
-    zscores = (df[column] - df[column].mean()) / df[column].std()
+    z_scores = (data_df[column] - data_df[column].mean()) / data_df[column].std()
 
     # Identify values with a z-score greater than the specified threshold
-    outliers = df[abs(zscores) > threshold]
+    outliers = data_df[abs(z_scores) > threshold]
 
     return outliers
 
 
-def plot_sequence_len_dist(data_df, split_name, bins=50):
+def plot_sequence_len_dist(data_df: pd.DataFrame,
+                           split_name: str = 'train',
+                           bins: int = 50):
     """
     Plot the distribution of sequence lengths for a given dataset.
 
-    :param data_df: DataFrame containing the dataset
-    :param split_name: Name of the dataset split (e.g. 'train', 'dev', 'test')
-    :param bins: Number of bins for the histogram
+    Args:
+        data_df (pd.DataFrame): DataFrame containing the dataset.
+        split_name (str): Name of the dataset split (e.g. 'train', 'dev', 'test').
+        bins (int): Number of bins for the histogram. Default is 50.
+
+    Returns:
+        None.
     """
     sns.histplot(data_df['sequence_len'].values, stat='frequency', bins=bins)
     plt.title(f'Sequence Length Distribution: {split_name}')
@@ -82,12 +130,17 @@ def plot_sequence_len_dist(data_df, split_name, bins=50):
     plt.grid(True)
 
 
-def get_amino_acid_freq(data_df, split_name):
+def get_amino_acid_freq(data_df: pd.DataFrame,
+                        split_name: str = 'train'):
     """
     Get the frequency of each amino acid in the sequences of a given DataFrame.
-    :param data_df: DataFrame containing the sequence data
-    :param split_name: Name of the dataset split (e.g. 'Train', 'Dev', 'Test')
-    :return: DataFrame containing the amino acid frequency data
+
+    Args:
+        data_df (pd.DataFrame): DataFrame containing the protein sequence data
+        split_name (str): Name of the dataset split (e.g. 'Train', 'Dev', 'Test')
+
+    Returns:
+        pandas DataFrame containing the amino acid frequency data.
     """
 
     # Extract the sequences from the DataFrame
@@ -96,8 +149,7 @@ def get_amino_acid_freq(data_df, split_name):
     # Count the occurrence of each amino acid in the sequences
     amino_acids_counter = Counter()
     for seq in sequences:
-        for char in seq:
-            amino_acids_counter.update(char)
+        amino_acids_counter.update(seq)
 
     # Print the dataset split name and the number of unique amino acids
     print(f'\t##### {split_name}')
@@ -117,13 +169,18 @@ def get_amino_acid_freq(data_df, split_name):
     return df
 
 
-def plot_code_freq(data_df, split_name):
+def plot_code_freq(data_df: pd.DataFrame,
+                   split_name: str = 'train'):
     """
     Plot the frequency of amino acid codes in a given dataset.
-    :param data_df: DataFrame containing the data
-    :param split_name: Name of the dataset (e.g. train, dev, test)
-    """
 
+    Args:
+        data_df (pd.DataFrame): DataFrame containing the data
+        split_name (str): Name of the dataset (e.g. train, dev, test)
+
+    Returns:
+        None
+    """
     # Set the color palette
     palette_colors = sns.color_palette("viridis", len(data_df))
 
@@ -134,23 +191,117 @@ def plot_code_freq(data_df, split_name):
     sns.barplot(x='amino_acid', y='frequency', data=data_df, palette=np.array(palette_colors))
 
 
-def plot_family_dist(data_df, split_name, bins=50):
+def plot_class_distribution_hist(data_df: pd.DataFrame,
+                                 split_name: str,
+                                 column_name: str,
+                                 num_bins: int = 50):
     """
-    Plot the distribution of family_id occurrences for a given dataset split.
+    Plot the distribution of class label occurrences for a given split of the dataset as a histogram.
 
-    :param data_df: pandas DataFrame containing the data for the split
-    :param split_name: string representing the name of the split (e.g. 'Train', 'Test', etc.)
-    :param bins: number of bins to use for the histogram
+    Args:
+        data_df (pd.DataFrame): DataFrame containing the data.
+        split_name (str): Name of the dataset split (e.g. 'Train', 'Test', etc.)
+        col_name (str): The name of the column containing the class values
+        num_bins (int): Number of bins to use for the histogram
+
+    Returns:
+        None.
     """
+    # Group the data by the true_label column and count the occurrences
+    class_label_counts = data_df.groupby(column_name).size()
 
-    # Compute the sizes of each true label group
-    family_sizes = data_df.groupby('family_id').size()
+    # Set the y-scale to log for a better visualization of the distribution
+    plt.yscale('log')
 
-    # Plot the histogram
-    sns.histplot(family_sizes, stat='frequency', bins=bins)
-    plt.title(f'Distribution of family_id occurrences for {split_name}')
-    plt.xlabel('True label occurrence')
-    plt.grid(True)
+    # Plot the histogram of class label counts
+    sns.histplot(class_label_counts, stat='frequency', bins=num_bins)
+
+    # Set the title and labels for the plot
+    plt.title(f'Distribution of class label occurrences for {split_name}')
+    plt.xlabel('Class label occurrence')
+    plt.ylabel('Frequency (log scale)')
+
+
+def plot_class_distribution_line(data_df: pd.DataFrame,
+                                 column_name: str = 'true_label'):
+    """Plot the distribution of classes in the given DataFrame as a line on the logarithmic scale
+
+    Args:
+        data_df (pd.DataFrame): DataFrame containing the data.
+        column_name (str): str representing the name of the column containing the class labels.
+
+    Returns:
+        None.
+    """
+    # Group the data by the class column and count the occurrences
+    class_counts = data_df.groupby(column_name).size().sort_values(ascending=False)
+
+    # Extract the values of the class counts
+    class_counts_values = class_counts.values
+
+    # Set the y-scale to logarithmic for a better visualization of the distribution
+    plt.yscale('log')
+
+    # Set the y-tick labels to use a more human-readable format
+    plt.yticks(
+        ticks=[1, 10, 100, 1000, 10000],
+        labels=[1, '10', '100', '1K', '10K']
+    )
+
+    # Plot the class counts as a line plot
+    plt.plot(class_counts_values)
+
+    # Set the x- and y-axis labels
+    plt.xlabel('Target Class')
+    plt.ylabel('Samples per class')
+
+    # Set the x-tick labels to the first and last class labels in the DataFrame
+    plt.xticks(
+        ticks=[0, class_counts_values.size-1],
+        labels=[class_counts.index[0], class_counts.index[-1]]
+    )
+
+
+def plot_class_percentage_distribution_line(data_df: pd.DataFrame,
+                                            column_name: str = 'true_label'):
+    """Plot the percentage of samples in each class relative to the full size of the dataset.
+
+    Args:
+        data_df (pd.DataFrame): DataFrame containing the data.
+        column_name (str): str representing the name of the column containing the class labels.
+
+    Returns:
+        None.
+    """
+    # Group the data by the class column and count the occurrences
+    class_counts = data_df.groupby(column_name).size().sort_values(ascending=False)
+
+    # Calculate the percentage of samples in each class relative to the full size of the dataset
+    class_percentages = 100 * class_counts.values / class_counts.values.sum()
+
+    # Set the y-scale to logarithmic for a better visualization of the distribution
+    plt.yscale('log')
+
+    # Set the y-tick labels to use a more human-readable format
+    ticks = list(10.**(-np.arange(1,5))) + [class_percentages[0]]
+    labels = [f'{p:.5f}%' for p in ticks]
+    plt.yticks(
+        ticks=ticks,
+        labels=labels
+    )
+
+    # Plot the class percentages as a line plot
+    plt.plot(class_percentages)
+
+    # Set the x- and y-axis labels
+    plt.xlabel('Class')
+    plt.ylabel('Dataset %')
+
+    # Set the x-tick labels to the first and last class labels in the DataFrame
+    plt.xticks(
+        ticks=[0, class_percentages.size-1],
+        labels=[class_counts.index[0], class_counts.index[-1]]
+    )
 
 
 def explore_pfam_dataset(data_partitions_dirpath):
@@ -291,7 +442,7 @@ def explore_pfam_dataset(data_partitions_dirpath):
 
 if __name__ == "__main__":
     """
-    Interactive Data Exploration is performed in the jupyter notebook in notebooks.
+    Interactive Data Exploration is performed in the jupyter notebook in ../notebooks.
     """
 
     parser = argparse.ArgumentParser(description='Perform Data Exploration on the Pfam random dataset')
@@ -301,3 +452,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     explore_pfam_dataset(data_partitions_dirpath=args.data_path)
+
