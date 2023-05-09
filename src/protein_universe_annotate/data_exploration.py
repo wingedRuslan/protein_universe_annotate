@@ -2,11 +2,15 @@ import os
 import pandas as pd
 import numpy as np
 from collections import Counter
+from sklearn.preprocessing import LabelEncoder
 import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
+from pathlib import Path
+from typing import Tuple
 
 from protein_universe_annotate.data_processing import read_pfam_dataset
+from protein_universe_annotate.utils import save_label_encoder
 
 
 def get_partitions_info(data_frames: list,
@@ -290,65 +294,155 @@ def plot_class_percentage_distribution_line(data_df: pd.DataFrame,
     )
 
 
-def explore_pfam_dataset(data_partitions_dirpath):
+def filter_dataset(train_df: pd.DataFrame,
+                   dev_df: pd.DataFrame,
+                   test_df: pd.DataFrame,
+                   save_path: str,
+                   min_seq_len: int = 30,
+                   max_seq_len: int = 300,
+                   rare_amino_acids: tuple = ('X', 'U', 'B', 'O', 'Z'),
+                   target_labels_frac: float = 0.1) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Perform data analysis to explore statistics and potential issues of the dataset.
+    Filter the protein sequence dataset and preprocess it for the classification task.
 
     Args:
-    data_partitions_dirpath (str): The directory path where the dataset partitions are stored.
+        train_df (pd.DataFrame): DataFrame containing training data.
+        dev_df (pd.DataFrame): DataFrame containing development data.
+        test_df (pd.DataFrame): DataFrame containing test data.
+        save_path (str): The directory path where the filtered datasets will be saved.
+        min_seq_len (int, optional): The minimum sequence length to consider. Defaults to 30.
+        max_seq_len (int, optional): The maximum sequence length to consider. Defaults to 300.
+        rare_amino_acids (tuple, optional): List of rare amino acids to remove from sequences. Defaults to ('X', 'U', 'B', 'O', 'Z').
+        target_labels_frac (float, optional): Fraction of target labels to keep. Defaults to 0.1.
+
+    Returns:
+        A tuple containing filtered DataFrames for training, development, and testing.
     """
+    # Keep only target labels present in all three partitions
+    train_true_labels = set(train_df.true_label.unique())
+    dev_true_labels = set(dev_df.true_label.unique())
+    test_true_labels = set(test_df.true_label.unique())
+
+    # Find the intersection of target labels in all three datasets
+    common_labels = train_true_labels.intersection(dev_true_labels, test_true_labels)
+
+    # Filter out labels not present in all three datasets
+    train_df = train_df[train_df.true_label.isin(common_labels)]
+    dev_df = dev_df[dev_df.true_label.isin(common_labels)]
+    test_df = test_df[test_df.true_label.isin(common_labels)]
+
+    # Only consider sequences with length in a specified range
+    train_df = train_df[train_df.sequence_len.between(min_seq_len, max_seq_len, inclusive='both')]
+    dev_df = dev_df[dev_df.sequence_len.between(min_seq_len, max_seq_len, inclusive='both')]
+    test_df = test_df[test_df.sequence_len.between(min_seq_len, max_seq_len, inclusive='both')]
+
+    # Remove sequences containing rare amino acids
+    dev_df = dev_df[~dev_df['sequence'].str.contains('|'.join(rare_amino_acids))]
+    test_df = test_df[~test_df['sequence'].str.contains('|'.join(rare_amino_acids))]
+    train_df = train_df[~train_df['sequence'].str.contains('|'.join(rare_amino_acids))]
+
+    # Keep only a fraction of target labels (most frequent ones)
+    num_target_classes = int(target_labels_frac * len(common_labels))
+    most_freq_classes = set(
+        (train_df.groupby('true_label').size()
+         .sort_values(ascending=False)
+         .head(num_target_classes)
+         .keys())
+    )
+    train_df = train_df[train_df.true_label.isin(most_freq_classes)]
+    dev_df = dev_df[dev_df.true_label.isin(most_freq_classes)]
+    test_df = test_df[test_df.true_label.isin(most_freq_classes)]
+
+    # Encode the target labels
+    # Get labels
+    train_labels = train_df["true_label"].tolist()
+    test_labels = test_df["true_label"].tolist()
+    dev_labels = dev_df["true_label"].tolist()
+    all_labels = train_labels + test_labels + dev_labels
+
+    le = LabelEncoder().fit(all_labels)
+
+    train_labels = le.transform(train_labels)
+    test_labels = le.transform(test_labels)
+    dev_labels = le.transform(dev_labels)
+
+    assert len(list(le.classes_)) == num_target_classes
+
+    # Save the LabelEncoder as a Dict
+    save_label_encoder(le, save_path)
+
+    train_df["true_label_encoded"] = train_labels
+    test_df["true_label_encoded"] = test_labels
+    dev_df["true_label_encoded"] = dev_labels
+
+    # Save Filtered Datasets
+    train_df.to_csv(f"{save_path}/train_filtered.csv", index=False)
+    dev_df.to_csv(f"{save_path}/dev_filtered.csv", index=False)
+    test_df.to_csv(f"{save_path}/test_filtered.csv", index=False)
+
+    return train_df, dev_df, test_df
+
+
+def explore_pfam_dataset(data_partitions_dirpath: str,
+                         apply_filter: bool,
+                         save_path: str) -> None:
+    """
+    Perform data analysis to explore statistics and potential issues of the Pfam dataset.
+
+    Args:
+        data_partitions_dirpath (str): The directory path where the dataset partitions are stored.
+        apply_filter (bool): If to filter the dataset or not
+        save_path (str): Location where to save the filtered datasets
+    """
+    # Location where to save plots
+    plots_dir = Path('../../output')
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
     # Print the available dataset partitions
     print('Available dataset partitions: ', os.listdir(data_partitions_dirpath))
 
     # Read each dataset partition into a pandas DataFrame
-    dev_df = read_pfam_dataset('dev', data_partitions_dirpath)
-    test_df = read_pfam_dataset('test', data_partitions_dirpath)
-    train_df = read_pfam_dataset('train', data_partitions_dirpath)
+    partition_names = ['train', 'dev', 'test']
+    partition_frames = [read_pfam_dataset(dir_name, data_partitions_dirpath) for dir_name in partition_names]
 
     # Assign the dataset type to each sample by adding a new 'split' column
-    dev_df['split'] = 'dev'
-    test_df['split'] = 'test'
-    train_df['split'] = 'train'
+    for split_name, data_df in zip(partition_names, partition_frames):
+        data_df['split_name'] = split_name
 
     # Convert true labels from PF00001.21 to PF00001
-    dev_df['true_label'] = dev_df.family_accession.apply(lambda s: s.split('.')[0])
-    test_df['true_label'] = test_df.family_accession.apply(lambda s: s.split('.')[0])
-    train_df['true_label'] = train_df.family_accession.apply(lambda s: s.split('.')[0])
+    for data_df in partition_frames:
+        data_df['true_label'] = data_df.family_accession.apply(lambda s: s.split('.')[0])
 
     # Extract length of sequence
-    dev_df['sequence_len'] = dev_df['sequence'].apply(lambda x: len(x))
-    test_df['sequence_len'] = test_df['sequence'].apply(lambda x: len(x))
-    train_df['sequence_len'] = train_df['sequence'].apply(lambda x: len(x))
+    for data_df in partition_frames:
+        data_df['sequence_len'] = data_df['sequence'].apply(lambda x: len(x))
+
+    # Named references train, dev, and test sets for the respective partitions
+    train_df, dev_df, test_df = partition_frames
 
     # Concatenate the datasets in one DataFrame
     total_data_df = pd.concat([test_df, dev_df, train_df], ignore_index=True)
+
+    # Collect basic statistics about the partitions in a data sets to compare them
+    print(get_partitions_info(partition_frames, partition_names))
 
     # Basic info
     print(f"Number of samples from dev-test-train: {total_data_df.shape[0]}")
     print(f"Number of features: {total_data_df.shape[1]}")
     print(f"Features: {total_data_df.columns.tolist()}")
 
-    print(f"Dev size: {dev_df.shape[0]}")
-    print(f"Test size: {test_df.shape[0]}")
-    print(f"Train size: {train_df.shape[0]}")
-
     # Check for missing values in each column
     print('Missing values in dataset: \n', total_data_df.isnull().sum())
 
-    # checking for duplicates on the sample level
+    # Check for duplicates on the sample level
     print(f'Duplicated entries in dataset: {total_data_df.duplicated().any()}')
 
     # Check for duplicates on 'sequence' level in each dataset split
-    train_duplicates = train_df[train_df.duplicated(subset=['sequence'], keep='first')]
-    print(f'Num. duplicates in Train: {train_duplicates.shape[0]}')
+    for split_name, data_df in zip(partition_names, partition_frames):
+        seq_duplicates = data_df[data_df.duplicated(subset=['sequence'], keep='first')]
+        print(f'Num. duplicates in #{split_name}: {seq_duplicates.shape[0]}')
 
-    test_duplicates = test_df[test_df.duplicated(subset=['sequence'], keep='first')]
-    print(f'Num. duplicates in Test: {test_duplicates.shape[0]}')
-
-    dev_duplicates = dev_df[dev_df.duplicated(subset=['sequence'], keep='first')]
-    print(f'Num. duplicates in Dev: {dev_duplicates.shape[0]}')
-
-    # Does the target label like PF00001 have multiple versions?
+    # Does the target label like PF00001 have multiple versions (e.g. PF00001.12, PF00001.27)?
     print('The target variable \'family_accession\' contains only unique mapping to its version: {}'.
           format(is_bijection_mapping(total_data_df, col1='true_label', col2='family_accession')))
 
@@ -356,7 +450,6 @@ def explore_pfam_dataset(data_partitions_dirpath):
     print('The \'family_id\' feature contains only unique mapping to true_label feature: {}'.
           format(is_bijection_mapping(total_data_df, col1='family_id', col2='true_label')))
 
-    # Distinct target label
     num_distinct_labels = total_data_df['true_label'].nunique()
     print(f"There are {num_distinct_labels} distinct values in the 'true_label' column.")
     print('Number of unique classes in Train: ', train_df['true_label'].nunique())
@@ -365,16 +458,13 @@ def explore_pfam_dataset(data_partitions_dirpath):
 
     # Are there overlaps between sets in 'true_label'?
     overlapping_vals = compute_overlap(train_df, test_df, 'true_label')
-    print(f'Number of overlapping labels Train -- Test: {len(overlapping_vals)}, '
-          f'ratio: {len(overlapping_vals) / test_df["true_label"].nunique()}')
+    print(f'Number of overlapping labels Train -- Test: {len(overlapping_vals)}')
 
     overlapping_vals = compute_overlap(train_df, dev_df, 'true_label')
-    print(f'Number of overlapping labels Train -- Dev: {len(overlapping_vals)}, '
-          f'ratio: {len(overlapping_vals) / dev_df["true_label"].nunique()}')
+    print(f'Number of overlapping labels Train -- Dev: {len(overlapping_vals)}')
 
     overlapping_vals = compute_overlap(dev_df, test_df, 'true_label')
-    print(f'Number of overlapping labels Dev -- Test: {len(overlapping_vals)}, '
-          f'ratio: {len(overlapping_vals) / test_df["true_label"].nunique()}')
+    print(f'Number of overlapping labels Dev -- Test: {len(overlapping_vals)}')
 
     # Are there overlaps between sets in 'sequence'?
     overlapping_vals = compute_overlap(train_df, test_df, 'sequence')
@@ -397,7 +487,7 @@ def explore_pfam_dataset(data_partitions_dirpath):
     plot_sequence_len_dist(test_df, 'Test')
 
     plt.subplots_adjust(right=3.0)
-    plt.savefig('../../output/sequence_len_dist.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f"{plots_dir}/sequence_len_dist.png", dpi=300, bbox_inches='tight')
 
     # Get the frequency of each amino acid in the sequences of a given DataFrame
     dev_amino_acid_freq = get_amino_acid_freq(dev_df, 'Dev')
@@ -423,7 +513,13 @@ def explore_pfam_dataset(data_partitions_dirpath):
     plot_code_freq(test_amino_acid_freq, 'Test')
 
     plt.subplots_adjust(right=3.0)
-    plt.savefig('../../output/amino_acid_codes_dist.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f"{plots_dir}/amino_acid_codes_dist.png", dpi=300, bbox_inches='tight')
+
+    # Perform dataset filtering to reduce the size of the datsets
+    if apply_filter:
+        train_filtered_df, dev_filtered_df, test_filtered_df = \
+            filter_dataset(train_df, dev_df, test_df, save_path, min_seq_len=30, max_seq_len=300,
+                           rare_amino_acids=('X', 'U', 'B', 'O', 'Z'), target_labels_frac=0.1)
 
 
 if __name__ == "__main__":
@@ -435,7 +531,11 @@ if __name__ == "__main__":
     parser.add_argument('--data_path', type=str,
                         default='../../data/random_split/',
                         help='Path to the data directory')
+    parser.add_argument('--apply_filter', type=bool, default=False, help='Whether to filter the dataset or not')
+    parser.add_argument('--save_path', type=str, default='../../output/', help='Path to save the filtered dataset')
     args = parser.parse_args()
 
-    explore_pfam_dataset(data_partitions_dirpath=args.data_path)
+    explore_pfam_dataset(data_partitions_dirpath=args.data_path,
+                         apply_filter=args.apply_filter,
+                         save_path=args.save_path)
 
