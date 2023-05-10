@@ -337,9 +337,9 @@ def filter_dataset(train_df: pd.DataFrame,
     test_df = test_df[test_df.sequence_len.between(min_seq_len, max_seq_len, inclusive='both')]
 
     # Remove sequences containing rare amino acids
-    dev_df = dev_df[~dev_df['sequence'].str.contains('|'.join(rare_amino_acids))]
-    test_df = test_df[~test_df['sequence'].str.contains('|'.join(rare_amino_acids))]
-    train_df = train_df[~train_df['sequence'].str.contains('|'.join(rare_amino_acids))]
+    # dev_df = dev_df[~dev_df['sequence'].str.contains('|'.join(rare_amino_acids))]
+    # test_df = test_df[~test_df['sequence'].str.contains('|'.join(rare_amino_acids))]
+    # train_df = train_df[~train_df['sequence'].str.contains('|'.join(rare_amino_acids))]
 
     # Keep only a fraction of target labels (most frequent ones)
     num_target_classes = int(target_labels_frac * len(common_labels))
