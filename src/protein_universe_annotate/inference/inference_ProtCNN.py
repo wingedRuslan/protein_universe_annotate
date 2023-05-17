@@ -9,7 +9,7 @@ from tensorflow.python.util import deprecation
 deprecation._PRINT_DEPRECATION_WARNINGS = False
 
 from protein_universe_annotate.utils import get_top_k_values_indices
-from protein_universe_annotate.config import AMINO_ACID_VOCABULARY, _PFAM_GAP_CHARACTER
+from protein_universe_annotate.constants import AMINO_ACID_VOCABULARY, _PFAM_GAP_CHARACTER
 from protein_universe_annotate.data_processing import read_pfam_dataset
 from protein_universe_annotate.inference.inference_misc import infer_predictions
 
