@@ -49,3 +49,21 @@ def save_label_encoder(label_encoder: LabelEncoder,
 
     return
 
+
+def get_array_size_in_mb(arr):
+    """
+    Calculate the size of a NumPy array in megabytes (MB).
+
+    Args:
+        arr (numpy.ndarray): The NumPy array.
+
+    Returns:
+        float: The size of the array in megabytes.
+    """
+    # Get the size of the array in bytes
+    size_in_bytes = arr.nbytes
+
+    # Convert to megabytes (MB)
+    size_in_mb = size_in_bytes / (1024 * 1024)
+
+    return size_in_mb
