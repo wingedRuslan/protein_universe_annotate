@@ -1,17 +1,15 @@
-scipy==1.7.0
+matplotlib==3.7.1
+matplotlib-inline==0.1.6
+matplotlib-venn==0.11.9
 numpy==1.22.4
 pandas==1.5.3
-pytest==7.2.2
+scikit-learn==1.2.2
 seaborn==0.12.2
-scikit-learn==1.0.2.
-tokenizers==0.13.3
-torch @ https://download.pytorch.org/whl/cu118/torch-2.0.0%2Bcu118-cp39-cp39-linux_x86_64.whl
-torchaudio @ https://download.pytorch.org/whl/cu118/torchaudio-2.0.1%2Bcu118-cp39-cp39-linux_x86_64.whl
+six==1.16.0
+torch @ https://download.pytorch.org/whl/cu118/torch-2.0.0%2Bcu118-cp310-cp310-linux_x86_64.whl#sha256=4b690e2b77f21073500c65d8bb9ea9656b8cb4e969f357370bbc992a3b074764
 torchdata==0.6.0
 torchsummary==1.5.1
 torchtext==0.15.1
-torchvision @ https://download.pytorch.org/whl/cu118/torchvision-0.15.1%2Bcu118-cp39-cp39-linux_x86_64.whl
+torchvision @ https://download.pytorch.org/whl/cu118/torchvision-0.15.1%2Bcu118-cp310-cp310-linux_x86_64.whl#sha256=9a679fa37a741018c804234693bbac3d487fb3dd55ee73f6b33677b177c8c07a
+pytest==7.3.1
 tqdm==4.65.0
-transformers==4.28.1
-# for loading the ProtCNN model
-tensorflow==2.12.0
