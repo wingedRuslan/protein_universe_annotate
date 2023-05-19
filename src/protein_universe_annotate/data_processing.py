@@ -1,5 +1,7 @@
 import os
 import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer
+import logging
 
 
 def read_pfam_dataset(partition='dev', data_dir='../../data/random_split'):
@@ -55,3 +57,32 @@ def select_long_tail(data_df, col_name):
 
     return data_selected
 
+
+def fit_count_vectorizer(ngram_range, max_features, input_sequences):
+    """
+    Fit a CountVectorizer for character n-grams.
+
+    Tokenize the protein sequences into individual amino acids (analyzer='char').
+
+    Args:
+        ngram_range (tuple): The range of n-grams to include, e.g., (1, 3) for 1-3 grams.
+        max_features (int): The maximum number of features (vocabulary size) to limit the feature representation.
+        input_sequences (list): List of input sequences to fit the CountVectorizer on.
+
+    Returns:
+        sklearn.feature_extraction.text.CountVectorizer: Fitted CountVectorizer object.
+    """
+    # Log the message about fitting the CountVectorizer
+    logging.info(f"Fitting a CountVectorizer with ngram_range={ngram_range}, max_features={max_features} "
+                 f"on {len(input_sequences)} input sequences.")
+
+    # Initialize and configure the CountVectorizer
+    vectorizer = CountVectorizer(lowercase=False, analyzer='char', ngram_range=ngram_range, max_features=max_features)
+
+    # Fit the CountVectorizer on the input sequences
+    vectorizer.fit(input_sequences)
+
+    # assert len(vectorizer.vocabulary_) == max_features
+    # print(vectorizer.vocabulary_)
+
+    return vectorizer
