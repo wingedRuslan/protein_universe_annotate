@@ -1,4 +1,7 @@
 
+# HTML versions of the notebooks
+*.html
+
 # Outputs (e.g. predictions)
 output/
 
