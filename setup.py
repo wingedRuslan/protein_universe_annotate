@@ -2,18 +2,15 @@ from setuptools import setup, find_packages
 
 # Specify the required dependencies for the package
 install_requires = [
-    'scipy==1.7.0',
     'numpy==1.22.4',
     'pandas==1.5.3',
-    'pytest==7.2.2',
+    'scikit-learn==1.2.2',
+    'matplotlib==3.7.1',
     'seaborn==0.12.2',
-    'scikit-learn==1.0.2.',
-    'tokenizers==0.13.3',
+    'pytest==7.2.2',
     'tqdm==4.65.0',
-    'transformers==4.28.1',
-    'tensorflow==2.12.0',
-    'numpy==1.21.2',
-    'pandas==1.3.2'
+    'pytorch==2.0.1',
+    'torchvision==0.15.2'
 ]
 
 setup(
@@ -24,5 +21,3 @@ setup(
     description='Predict the function of protein domains, based on the PFam dataset.',
     install_requires=install_requires
 )
-
-
