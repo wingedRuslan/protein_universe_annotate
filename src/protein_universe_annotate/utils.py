@@ -50,7 +50,7 @@ def save_label_encoder(label_encoder: LabelEncoder,
     return
 
 
-def get_array_size_in_mb(arr):
+def get_array_size_in_mb(arr: np.ndarray) -> float:
     """
     Calculate the size of a NumPy array in megabytes (MB).
 
