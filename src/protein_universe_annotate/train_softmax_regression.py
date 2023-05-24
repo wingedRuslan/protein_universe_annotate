@@ -106,7 +106,7 @@ def train_softmax_regression(train_data_path, test_data_path, dev_data_path, out
     test_predictions, test_acc = model.predict(dataloaders['test'])
 
     # Save the trained model
-    model.save_model(save_path=output_dir)
+    model.save_model(state_dict_model_path=output_dir)
 
     # Save predicted labels
     test_df['softmaxreg_preds'] = test_predictions
