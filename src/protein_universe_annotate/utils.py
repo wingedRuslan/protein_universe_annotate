@@ -1,6 +1,8 @@
 import numpy as np
 import json
 from sklearn.preprocessing import LabelEncoder
+from sklearn.feature_extraction.text import CountVectorizer
+import os
 
 
 def get_top_k_values_indices(arr: np.ndarray,
@@ -67,3 +69,93 @@ def get_array_size_in_mb(arr: np.ndarray) -> float:
     size_in_mb = size_in_bytes / (1024 * 1024)
 
     return size_in_mb
+
+
+def save_count_vectorizer_params(count_vectorizer: CountVectorizer,
+                                 output_dir: str) -> None:
+    """
+    Save the parameters of the CountVectorizer as a JSON file.
+
+    Args:
+        count_vectorizer (sklearn.feature_extraction.text.CountVectorizer): The CountVectorizer object.
+        output_dir (str): Directory path to save the JSON file.
+    """
+    # Create the output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Get the parameters of the CountVectorizer
+    count_vectorizer_params = count_vectorizer.get_params()
+
+    # Convert non-serializable values to JSON serializable types
+    for key, value in count_vectorizer_params.items():
+        if isinstance(value, type):
+            count_vectorizer_params[key] = str(value)
+
+    # Save the parameters to a JSON file
+    output_path = os.path.join(output_dir, 'count_vectorizer_params.json')
+    with open(output_path, 'w') as file:
+        json.dump(count_vectorizer_params, file, indent=4)
+    print(f"CountVectorizer parameters saved at: {output_path}")
+
+    return
+
+
+def save_count_vectorizer_vocab(count_vectorizer: CountVectorizer,
+                                output_dir: str) -> None:
+    """
+    Save the vocabulary of the CountVectorizer as a JSON file.
+
+    Args:
+        count_vectorizer (sklearn.feature_extraction.text.CountVectorizer): The CountVectorizer object.
+        output_dir (str): Directory path to save the JSON file.
+    """
+    # Create the output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Extract the vocabulary
+    vocabulary = count_vectorizer.vocabulary_
+
+    # Convert the values to integers to allow json serialization (no support for numpy.int64)
+    vocabulary = {key: int(value) for key, value in vocabulary.items()}
+
+    output_path = os.path.join(output_dir, 'count_vectorizer_vocab.json')
+    with open(output_path, 'w') as file:
+        json.dump(vocabulary, file, indent=4)
+    print(f"CountVectorizer vocabulary saved at: {output_path}")
+
+    return
+
+
+def load_count_vectorizer(cv_params_path: str,
+                          cv_vocab_path: str) -> CountVectorizer:
+    """
+    Load CountVectorizer object from saved parameters and vocabulary.
+
+    Args:
+        cv_params_path (str): Path to the JSON file containing CountVectorizer parameters.
+        cv_vocab_path (str): Path to the JSON file containing CountVectorizer vocabulary.
+
+    Returns:
+        sklearn.feature_extraction.text.CountVectorizer: Loaded CountVectorizer object.
+    """
+
+    # Load CountVectorizer parameters from JSON file
+    with open(cv_params_path, 'r') as f:
+        cv_params = json.load(f)
+
+    # Load CountVectorizer vocabulary from JSON file
+    with open(cv_vocab_path, 'r') as file:
+        cv_vocab = json.load(file)
+
+    # Instantiate CountVectorizer object with loaded parameters and vocabulary
+    loaded_cv = CountVectorizer(lowercase=cv_params['lowercase'],
+                                analyzer=cv_params['analyzer'],
+                                ngram_range=cv_params['ngram_range'],
+                                max_features=cv_params['max_features'],
+                                vocabulary=cv_vocab)
+
+    assert len(loaded_cv.get_feature_names_out()) == cv_params['max_features']
+    assert len(loaded_cv.vocabulary_) == cv_params['max_features']
+
+    return loaded_cv
+
